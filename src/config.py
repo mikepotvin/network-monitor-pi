@@ -1,4 +1,5 @@
 import subprocess
+from typing import Optional
 
 
 # --- Ping Configuration ---
@@ -47,7 +48,7 @@ DEGRADED_LOSS_PCT = 10
 OUTAGE_CONSECUTIVE_FAILURES = 3
 
 
-def detect_gateway() -> str | None:
+def detect_gateway() -> Optional[str]:
     """Detect the default gateway IP from the system routing table."""
     try:
         result = subprocess.run(
