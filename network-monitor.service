@@ -1,0 +1,17 @@
+[Unit]
+Description=Network Monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=networkmon
+Group=networkmon
+WorkingDirectory=/opt/network-monitor
+ExecStart=/opt/network-monitor/venv/bin/gunicorn -w 1 -b 0.0.0.0:5000 src.web:app
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
