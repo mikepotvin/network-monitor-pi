@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Monitor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='js/uplot.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav>
+        <span class="logo">Network Monitor</span>
+        <button class="active" data-page="status">Live Status</button>
+        <button data-page="timeline">Timeline</button>
+        <button data-page="outages">Outage Log</button>
+        <button data-page="speedtests">Speed Tests</button>
+    </nav>
+
+    <main>
+        <!-- Live Status Page -->
+        <div id="page-status" class="page active">
+            <div id="status-banner" class="status-banner up">Loading...</div>
+            <div id="target-cards" class="cards"></div>
+            <div class="cards">
+                <div class="card" id="dns-card">
+                    <div class="label">DNS Resolution</div>
+                    <div class="value" id="dns-value">--</div>
+                    <div class="meta" id="dns-meta"></div>
+                </div>
+                <div class="card" id="http-card">
+                    <div class="label">HTTP Reachability</div>
+                    <div class="value" id="http-value">--</div>
+                    <div class="meta" id="http-meta"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timeline Page -->
+        <div id="page-timeline" class="page">
+            <div class="range-selector">
+                <button class="active" data-range="24h">24 Hours</button>
+                <button data-range="7d">7 Days</button>
+                <button data-range="30d">30 Days</button>
+            </div>
+            <div class="chart-container">
+                <div id="latency-chart"></div>
+            </div>
+        </div>
+
+        <!-- Outage Log Page -->
+        <div id="page-outages" class="page">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Start</th>
+                            <th>End</th>
+                            <th>Duration</th>
+                            <th>Target</th>
+                            <th>Error</th>
+                        </tr>
+                    </thead>
+                    <tbody id="outage-table-body">
+                    </tbody>
+                </table>
+            </div>
+            <p id="outage-empty" style="display:none; text-align:center; padding:2rem; color:var(--text-secondary);">
+                No outages detected. Your network is looking good!
+            </p>
+        </div>
+
+        <!-- Speed Tests Page -->
+        <div id="page-speedtests" class="page">
+            <div class="chart-container">
+                <div id="speed-chart"></div>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Download</th>
+                            <th>Upload</th>
+                            <th>Ping</th>
+                            <th>Server</th>
+                        </tr>
+                    </thead>
+                    <tbody id="speed-table-body">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/uplot.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
