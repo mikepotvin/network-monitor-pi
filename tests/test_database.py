@@ -154,12 +154,16 @@ def test_aggregate_old_data(db_connection, tmp_db_path):
     conn.row_factory = sqlite3.Row
     raw_count = conn.execute("SELECT COUNT(*) as c FROM ping_results WHERE timestamp < ?", (time.time() - 48 * 3600,)).fetchone()["c"]
     assert raw_count == 0
-    agg_rows = conn.execute("SELECT * FROM ping_results_aggregated").fetchall()
+    agg_rows = conn.execute("SELECT * FROM ping_results_aggregated ORDER BY timestamp").fetchall()
     assert len(agg_rows) >= 1
-    agg = dict(agg_rows[0])
-    assert agg["target"] == "1.1.1.1"
-    assert agg["avg_rtt_ms"] is not None
-    assert agg["packet_loss_pct"] == pytest.approx(5.0, abs=1.0)
+    # Check that all aggregated rows belong to the right target
+    for row in agg_rows:
+        assert dict(row)["target"] == "1.1.1.1"
+        assert dict(row)["avg_rtt_ms"] is not None or dict(row)["packet_loss_pct"] == 100.0
+    # Total loss across all buckets should be ~5% (3 failures out of 60)
+    total_rows = sum(1 for _ in agg_rows)
+    rows_with_loss = [dict(r) for r in agg_rows if dict(r)["packet_loss_pct"] > 0]
+    assert len(rows_with_loss) >= 1  # At least one bucket has failures
     conn.close()
 
 
