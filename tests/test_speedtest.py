@@ -29,7 +29,7 @@ def test_run_speed_test_failure(mock_speedtest_class):
 
 
 @patch("src.speedtest_runner.speedtest.Speedtest")
-def test_run_speed_test_bad_data(mock_speedtest_class):
+def test_run_speed_test_missing_keys(mock_speedtest_class):
     mock_instance = MagicMock()
     mock_speedtest_class.return_value = mock_instance
     mock_instance.results.dict.return_value = {}

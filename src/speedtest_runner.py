@@ -28,5 +28,6 @@ def run_speed_test():
         logger.error("Speed test failed to parse: %s", e)
         return None
     except Exception as e:
+        # Catches network errors, timeouts, and API failures from speedtest calls
         logger.error("Speed test failed: %s", e)
         return None
