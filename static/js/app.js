@@ -7,6 +7,8 @@ let packetLossPlot = null;
 let speedPlot = null;
 let statusInterval = null;
 let errorHours = 24;
+let logLines = 100;
+let speedTestPollInterval = null;
 
 // --- Navigation ---
 document.querySelectorAll("nav button").forEach((btn) => {
@@ -23,6 +25,7 @@ function switchPage(page) {
   document.getElementById(`page-${page}`).classList.add("active");
 
   clearInterval(statusInterval);
+  clearInterval(speedTestPollInterval);
 
   if (page === "status") {
     loadStatus();
@@ -37,6 +40,9 @@ function switchPage(page) {
     loadErrors(errorHours);
   } else if (page === "speedtests") {
     loadSpeedTests();
+    checkSpeedTestRunning();
+  } else if (page === "logs") {
+    loadLogs(logLines);
   }
 }
 
@@ -65,6 +71,15 @@ document.querySelectorAll("#error-range-selector button").forEach((btn) => {
     document.querySelectorAll("#error-range-selector button").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     loadErrors(errorHours);
+  });
+});
+
+document.querySelectorAll("#log-line-selector button").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    logLines = parseInt(btn.dataset.lines, 10);
+    document.querySelectorAll("#log-line-selector button").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    loadLogs(logLines);
   });
 });
 
@@ -453,6 +468,90 @@ function renderErrors(errors) {
     </tr>`
     )
     .join("");
+}
+
+// --- Logs ---
+async function loadLogs(lines) {
+  const output = document.getElementById("log-output");
+  output.textContent = "Loading logs...";
+  try {
+    const res = await fetch(`/api/logs?lines=${lines}`);
+    output.textContent = await res.text();
+    output.scrollTop = output.scrollHeight;
+  } catch (e) {
+    output.textContent = "Failed to load logs: " + e.message;
+  }
+}
+
+document.getElementById("copy-logs-btn").addEventListener("click", () => {
+  const text = document.getElementById("log-output").textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById("copy-logs-btn");
+    btn.textContent = "Copied!";
+    setTimeout(() => { btn.textContent = "Copy to Clipboard"; }, 2000);
+  });
+});
+
+// --- Speed Test Trigger ---
+document.getElementById("run-speedtest-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("run-speedtest-btn");
+  const status = document.getElementById("speedtest-status");
+  btn.disabled = true;
+  status.textContent = "";
+
+  try {
+    const res = await fetch("/api/speedtest/run", { method: "POST" });
+    const data = await res.json();
+    if (!res.ok) {
+      status.textContent = data.error;
+      btn.disabled = false;
+      return;
+    }
+    status.textContent = "Running speed test...";
+    startSpeedTestPoll();
+  } catch (e) {
+    status.textContent = "Failed to start: " + e.message;
+    btn.disabled = false;
+  }
+});
+
+function startSpeedTestPoll() {
+  clearInterval(speedTestPollInterval);
+  speedTestPollInterval = setInterval(async () => {
+    try {
+      const res = await fetch("/api/speedtest/status");
+      const data = await res.json();
+      const status = document.getElementById("speedtest-status");
+      const btn = document.getElementById("run-speedtest-btn");
+
+      if (!data.running) {
+        clearInterval(speedTestPollInterval);
+        btn.disabled = false;
+        if (data.error) {
+          status.textContent = "Error: " + data.error;
+        } else if (data.result) {
+          status.textContent = `Done: ${data.result.download_mbps} Mbps down / ${data.result.upload_mbps} Mbps up`;
+        } else {
+          status.textContent = "Completed";
+        }
+        loadSpeedTests();
+      }
+    } catch (e) {
+      console.error("Poll failed:", e);
+    }
+  }, 3000);
+}
+
+async function checkSpeedTestRunning() {
+  try {
+    const res = await fetch("/api/speedtest/status");
+    const data = await res.json();
+    if (data.running) {
+      document.getElementById("run-speedtest-btn").disabled = true;
+      document.getElementById("speedtest-status").textContent = "Running speed test...";
+      startSpeedTestPoll();
+    }
+  } catch (e) { /* ignore */ }
 }
 
 // --- XSS Protection ---

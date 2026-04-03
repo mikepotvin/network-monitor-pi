@@ -136,6 +136,85 @@ def test_api_errors(client):
     assert isinstance(data, list)
 
 
+@patch("src.web.subprocess.run")
+def test_api_logs(mock_run, client):
+    mock_run.return_value = MagicMock(stdout="Apr 02 01:00:00 pi systemd[1]: Started.\n")
+    response = client.get("/api/logs")
+    assert response.status_code == 200
+    assert response.content_type.startswith("text/plain")
+    assert b"Started" in response.data
+
+
+@patch("src.web.subprocess.run")
+def test_api_logs_custom_lines(mock_run, client):
+    mock_run.return_value = MagicMock(stdout="line1\nline2\n")
+    response = client.get("/api/logs?lines=200")
+    assert response.status_code == 200
+    args = mock_run.call_args[0][0]
+    assert "-n" in args
+    assert "200" in args
+
+
+@patch("src.web.subprocess.run")
+def test_api_logs_clamps_lines(mock_run, client):
+    mock_run.return_value = MagicMock(stdout="")
+    client.get("/api/logs?lines=9999")
+    args = mock_run.call_args[0][0]
+    assert "1000" in args
+
+
+@patch("src.web.subprocess.run", side_effect=FileNotFoundError("no journalctl"))
+def test_api_logs_journalctl_missing(mock_run, client):
+    response = client.get("/api/logs")
+    assert response.status_code == 500
+
+
+def test_api_speedtest_status(client):
+    response = client.get("/api/speedtest/status")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert "running" in data
+    assert "last_run_time" in data
+
+
+@patch("src.web.run_speed_test")
+def test_api_speedtest_run_returns_202(mock_run, client):
+    mock_run.return_value = {
+        "timestamp": time.time(), "download_mbps": 50.0, "upload_mbps": 10.0,
+        "ping_ms": 20.0, "server_name": "Test",
+    }
+    import src.web as web
+    web._speed_test_status["running"] = False
+    web._speed_test_status["last_run_time"] = 0.0
+    response = client.post("/api/speedtest/run")
+    assert response.status_code == 202
+    data = response.get_json()
+    assert data["status"] == "started"
+    # Wait briefly for thread to finish, then reset
+    time.sleep(0.5)
+    web._speed_test_status["running"] = False
+    web._speed_test_status["last_run_time"] = 0.0
+
+
+@patch("src.web.run_speed_test")
+def test_api_speedtest_run_409_when_running(mock_run, client):
+    import src.web as web
+    web._speed_test_status["running"] = True
+    response = client.post("/api/speedtest/run")
+    assert response.status_code == 409
+    web._speed_test_status["running"] = False
+
+
+@patch("src.web.run_speed_test")
+def test_api_speedtest_run_429_rate_limit(mock_run, client):
+    import src.web as web
+    web._speed_test_status["running"] = False
+    web._speed_test_status["last_run_time"] = time.time()
+    response = client.post("/api/speedtest/run")
+    assert response.status_code == 429
+    web._speed_test_status["last_run_time"] = 0.0
+
+
 def test_index_page(client):
     response = client.get("/")
     assert response.status_code == 200

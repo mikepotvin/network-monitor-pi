@@ -16,6 +16,7 @@
         <button data-page="outages">Outage Log</button>
         <button data-page="errors">Error Log</button>
         <button data-page="speedtests">Speed Tests</button>
+        <button data-page="logs">Logs</button>
     </nav>
 
     <main>
@@ -113,6 +114,10 @@
 
         <!-- Speed Tests Page -->
         <div id="page-speedtests" class="page">
+            <div class="speedtest-controls">
+                <button id="run-speedtest-btn" class="btn-primary">Run Speed Test</button>
+                <span id="speedtest-status" class="speedtest-status"></span>
+            </div>
             <div class="chart-container">
                 <div id="speed-chart"></div>
             </div>
@@ -130,6 +135,20 @@
                     <tbody id="speed-table-body">
                     </tbody>
                 </table>
+            </div>
+        </div>
+        <!-- Logs Page -->
+        <div id="page-logs" class="page">
+            <div class="log-controls">
+                <div class="range-selector" id="log-line-selector">
+                    <button class="active" data-lines="100">100 lines</button>
+                    <button data-lines="200">200 lines</button>
+                    <button data-lines="500">500 lines</button>
+                </div>
+                <button id="copy-logs-btn" class="btn-primary">Copy to Clipboard</button>
+            </div>
+            <div class="log-container">
+                <pre id="log-output"></pre>
             </div>
         </div>
     </main>

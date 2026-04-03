@@ -1,5 +1,8 @@
 import logging
 import os
+import subprocess
+import threading
+import time as _time
 
 from flask import Flask, jsonify, render_template, request
 
@@ -16,7 +19,9 @@ from src.database import (
     get_latency_percentiles,
     get_packet_loss_timeline,
     get_error_log,
+    insert_speed_test,
 )
+from src.speedtest_runner import run_speed_test
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +29,48 @@ scheduler = None
 
 VALID_RANGES = {"24h": 24, "7d": 168, "30d": 720}
 
+# Speed test trigger state (safe with single gunicorn worker)
+_speed_test_lock = threading.Lock()
+_speed_test_status = {"running": False, "last_run_time": 0.0, "result": None, "error": None}
+SPEED_TEST_COOLDOWN = 300  # 5 minutes
+
 
 def get_db_path() -> str:
     """Return the database path, allowing override for testing."""
     return DB_PATH
+
+
+def _run_speed_test_background(db_path: str) -> None:
+    """Run speed test in background thread, update shared state."""
+    try:
+        result = run_speed_test()
+        if result:
+            insert_speed_test(
+                db_path,
+                result["timestamp"],
+                result["download_mbps"],
+                result["upload_mbps"],
+                result["ping_ms"],
+                result["server_name"],
+            )
+            _speed_test_status["result"] = result
+            _speed_test_status["error"] = None
+            logger.info(
+                "Manual speed test complete: %.1f↓ / %.1f↑ Mbps",
+                result["download_mbps"],
+                result["upload_mbps"],
+            )
+        else:
+            _speed_test_status["result"] = None
+            _speed_test_status["error"] = "Speed test returned no results"
+            logger.error("Manual speed test failed")
+    except Exception as e:
+        _speed_test_status["result"] = None
+        _speed_test_status["error"] = str(e)
+        logger.error("Manual speed test error: %s", e)
+    finally:
+        _speed_test_status["running"] = False
+        _speed_test_status["last_run_time"] = _time.time()
 
 
 def create_app(start_scheduler: bool = True) -> Flask:
@@ -153,6 +196,52 @@ def create_app(start_scheduler: bool = True) -> Flask:
         limit = request.args.get("limit", 100, type=int)
         data = get_error_log(db_path, hours=hours, page=page, limit=limit)
         return jsonify(data)
+
+    @app.route("/api/logs")
+    def api_logs():
+        lines = request.args.get("lines", 100, type=int)
+        lines = min(max(lines, 10), 1000)
+        try:
+            result = subprocess.run(
+                ["journalctl", "-u", "network-monitor", "--no-pager", "-n", str(lines)],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            return result.stdout, 200, {"Content-Type": "text/plain; charset=utf-8"}
+        except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+            return f"Failed to read logs: {e}", 500, {"Content-Type": "text/plain; charset=utf-8"}
+
+    @app.route("/api/speedtest/run", methods=["POST"])
+    def api_speedtest_run():
+        if _speed_test_status["running"]:
+            return jsonify({"error": "Speed test already running"}), 409
+
+        elapsed = _time.time() - _speed_test_status["last_run_time"]
+        if _speed_test_status["last_run_time"] > 0 and elapsed < SPEED_TEST_COOLDOWN:
+            wait = int(SPEED_TEST_COOLDOWN - elapsed)
+            return jsonify({"error": f"Please wait {wait}s before running another test"}), 429
+
+        with _speed_test_lock:
+            if _speed_test_status["running"]:
+                return jsonify({"error": "Speed test already running"}), 409
+            _speed_test_status["running"] = True
+            _speed_test_status["result"] = None
+            _speed_test_status["error"] = None
+
+        db_path = get_db_path()
+        t = threading.Thread(target=_run_speed_test_background, args=(db_path,), daemon=True)
+        t.start()
+        return jsonify({"status": "started"}), 202
+
+    @app.route("/api/speedtest/status")
+    def api_speedtest_status():
+        return jsonify({
+            "running": _speed_test_status["running"],
+            "last_run_time": _speed_test_status["last_run_time"],
+            "result": _speed_test_status["result"],
+            "error": _speed_test_status["error"],
+        })
 
     return app
 

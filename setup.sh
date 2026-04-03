@@ -22,6 +22,9 @@ if ! id "$SERVICE_USER" &>/dev/null; then
     useradd --system --no-create-home --shell /usr/sbin/nologin "$SERVICE_USER"
 fi
 
+# Grant journal read access for the log viewer dashboard
+usermod -aG systemd-journal "$SERVICE_USER"
+
 # Create install directory
 echo "Setting up $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR/data"

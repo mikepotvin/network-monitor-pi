@@ -58,6 +58,10 @@ Six SQLite tables: `ping_results`, `ping_results_aggregated`, `dns_checks`, `htt
 
 Target: Raspberry Pi running as systemd service (`network-monitor.service`). Installs to `/opt/network-monitor`, runs as `networkmon` user via gunicorn with a single worker.
 
+## Workflow
+
+When tests pass after completing a task, always commit and push without asking.
+
 ## Model Usage
 
 Use Opus for planning and design. Use Sonnet for implementation and execution.

@@ -240,6 +240,67 @@ tr:hover { background: rgba(255, 255, 255, 0.02); }
     overflow-x: auto;
 }
 
+/* --- Buttons --- */
+.btn-primary {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 0.4rem 1rem;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-family: var(--font);
+}
+
+.btn-primary:hover { opacity: 0.9; }
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* --- Speed Test Controls --- */
+.speedtest-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.speedtest-status {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* --- Log Viewer --- */
+.log-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.log-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: auto;
+    max-height: 70vh;
+}
+
+.log-container pre {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.6;
+    padding: 1rem;
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: var(--text-primary);
+}
+
 /* --- Responsive --- */
 @media (max-width: 640px) {
     nav { flex-wrap: wrap; }
