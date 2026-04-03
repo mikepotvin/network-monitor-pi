@@ -1,24 +1,22 @@
-import json
 import logging
-import subprocess
 import time
+
+import speedtest
 
 logger = logging.getLogger(__name__)
 
 
 def run_speed_test():
-    """Run a speed test using speedtest-cli and return results.
+    """Run a speed test using the speedtest-cli Python API and return results.
     Returns a dict with download_mbps, upload_mbps, ping_ms, server_name,
     and timestamp. Returns None if the test fails.
     """
     try:
-        result = subprocess.run(
-            ["speedtest-cli", "--json"],
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-        data = json.loads(result.stdout)
+        s = speedtest.Speedtest()
+        s.get_best_server()
+        s.download()
+        s.upload()
+        data = s.results.dict()
         return {
             "timestamp": time.time(),
             "download_mbps": round(data["download"] / 1_000_000, 2),
@@ -26,9 +24,10 @@ def run_speed_test():
             "ping_ms": data["ping"],
             "server_name": f"{data['server']['sponsor']} ({data['server']['name']})",
         }
-    except (json.JSONDecodeError, KeyError, subprocess.TimeoutExpired) as e:
+    except KeyError as e:
         logger.error("Speed test failed to parse: %s", e)
         return None
     except Exception as e:
+        # Catches network errors, timeouts, and API failures from speedtest calls
         logger.error("Speed test failed: %s", e)
         return None
