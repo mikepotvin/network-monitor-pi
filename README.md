@@ -64,10 +64,21 @@ sudo systemctl stop network-monitor
 
 ## Updating
 
+Full update (new dependencies, service file changes, or first time after adding features):
+
 ```bash
-cd /path/to/network-monitor-pi
+cd ~/network-monitor-pi   # wherever you cloned the repo
 git pull
-sudo bash setup.sh
+sudo bash setup.sh        # copies files to /opt, installs deps, restarts service
+```
+
+Quick update (Python/frontend code only, no new dependencies):
+
+```bash
+cd ~/network-monitor-pi
+git pull
+sudo cp -r src static templates /opt/network-monitor/
+sudo systemctl restart network-monitor
 ```
 
 ## Development
