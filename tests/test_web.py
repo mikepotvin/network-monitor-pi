@@ -99,6 +99,43 @@ def test_api_speedtests(client):
     assert data[0]["download_mbps"] == 100.0
 
 
+def test_api_health(client):
+    response = client.get("/api/health?range=24h")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert "targets" in data
+    assert len(data["targets"]) >= 2
+    for t in data["targets"]:
+        assert "uptime_pct" in t
+        assert "current_streak" in t
+        assert "outage_count" in t
+        assert "percentiles_available" in t
+
+
+def test_api_health_invalid_range(client):
+    response = client.get("/api/health?range=999h")
+    assert response.status_code == 400
+
+
+def test_api_packet_loss(client):
+    response = client.get("/api/packet-loss?range=24h")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert isinstance(data, list)
+
+
+def test_api_packet_loss_invalid_range(client):
+    response = client.get("/api/packet-loss?range=999h")
+    assert response.status_code == 400
+
+
+def test_api_errors(client):
+    response = client.get("/api/errors?hours=24")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert isinstance(data, list)
+
+
 def test_index_page(client):
     response = client.get("/")
     assert response.status_code == 200

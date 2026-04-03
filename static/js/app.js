@@ -1,9 +1,12 @@
 // --- State ---
 let currentPage = "status";
 let currentRange = "24h";
+let healthRange = "24h";
 let latencyPlot = null;
+let packetLossPlot = null;
 let speedPlot = null;
 let statusInterval = null;
+let errorHours = 24;
 
 // --- Navigation ---
 document.querySelectorAll("nav button").forEach((btn) => {
@@ -24,22 +27,44 @@ function switchPage(page) {
   if (page === "status") {
     loadStatus();
     statusInterval = setInterval(loadStatus, 5000);
+  } else if (page === "health") {
+    loadHealth(healthRange);
   } else if (page === "timeline") {
     loadTimeline(currentRange);
   } else if (page === "outages") {
     loadOutages();
+  } else if (page === "errors") {
+    loadErrors(errorHours);
   } else if (page === "speedtests") {
     loadSpeedTests();
   }
 }
 
-// --- Range Selector ---
-document.querySelectorAll(".range-selector button").forEach((btn) => {
+// --- Range Selectors ---
+document.querySelectorAll("#page-timeline .range-selector button").forEach((btn) => {
   btn.addEventListener("click", () => {
     currentRange = btn.dataset.range;
-    document.querySelectorAll(".range-selector button").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll("#page-timeline .range-selector button").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     loadTimeline(currentRange);
+  });
+});
+
+document.querySelectorAll("#health-range-selector button").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    healthRange = btn.dataset.range;
+    document.querySelectorAll("#health-range-selector button").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    loadHealth(healthRange);
+  });
+});
+
+document.querySelectorAll("#error-range-selector button").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    errorHours = parseInt(btn.dataset.hours, 10);
+    document.querySelectorAll("#error-range-selector button").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    loadErrors(errorHours);
   });
 });
 
@@ -133,9 +158,14 @@ function renderStatus(data) {
 // --- Timeline ---
 async function loadTimeline(range) {
   try {
-    const res = await fetch(`/api/timeline?range=${encodeURIComponent(range)}`);
-    const data = await res.json();
-    renderTimeline(data);
+    const [timelineRes, lossRes] = await Promise.all([
+      fetch(`/api/timeline?range=${encodeURIComponent(range)}`),
+      fetch(`/api/packet-loss?range=${encodeURIComponent(range)}`),
+    ]);
+    const timelineData = await timelineRes.json();
+    const lossData = await lossRes.json();
+    renderTimeline(timelineData);
+    renderPacketLoss(lossData);
   } catch (e) {
     console.error("Failed to load timeline:", e);
   }
@@ -289,6 +319,140 @@ function renderSpeedTests(data) {
 
   if (speedPlot) speedPlot.destroy();
   speedPlot = new uPlot(opts, [timestamps, downloads, uploads], container);
+}
+
+// --- Health ---
+async function loadHealth(range) {
+  try {
+    const res = await fetch(`/api/health?range=${encodeURIComponent(range)}`);
+    const data = await res.json();
+    renderHealth(data);
+  } catch (e) {
+    console.error("Failed to load health:", e);
+  }
+}
+
+function renderHealth(data) {
+  const cardsEl = document.getElementById("health-cards");
+  const targets = data.targets || [];
+
+  if (!targets.length) {
+    cardsEl.innerHTML = '<p style="text-align:center;padding:2rem;color:var(--text-secondary)">No data yet</p>';
+    return;
+  }
+
+  cardsEl.innerHTML = targets
+    .map((t) => {
+      const uptimeClass =
+        t.uptime_pct >= 99.9 ? "uptime-excellent" : t.uptime_pct >= 99 ? "uptime-good" : "uptime-poor";
+      const pctHtml = t.percentiles_available && t.p50 !== null
+        ? `<div class="percentiles">P50: ${formatMs(t.p50)} &nbsp;|&nbsp; P95: ${formatMs(t.p95)} &nbsp;|&nbsp; P99: ${formatMs(t.p99)}</div>`
+        : t.percentiles_available
+        ? ""
+        : '<div class="percentiles">Percentiles available for 24h range</div>';
+      return `
+      <div class="card">
+        <div class="label"><span class="status-dot ${t.uptime_pct >= 99.9 ? "ok" : t.uptime_pct >= 99 ? "degraded" : "down"}"></span>${escapeHtml(t.target_name)}</div>
+        <div class="value ${uptimeClass}">${t.uptime_pct.toFixed(2)}%</div>
+        <div class="meta">
+          Streak: ${t.current_streak.toLocaleString()} pings
+          &nbsp;·&nbsp; Outages: ${t.outage_count}
+        </div>
+        ${pctHtml}
+      </div>`;
+    })
+    .join("");
+}
+
+// --- Packet Loss Chart ---
+function renderPacketLoss(data) {
+  const container = document.getElementById("packet-loss-chart");
+  container.innerHTML = "";
+
+  if (!data.length) {
+    container.innerHTML = '<p style="text-align:center;padding:2rem;color:var(--text-secondary)">No data for this time range</p>';
+    return;
+  }
+
+  const targets = {};
+  data.forEach((row) => {
+    const name = row.target_name || row.target;
+    if (!targets[name]) targets[name] = [];
+    targets[name].push(row);
+  });
+
+  const targetNames = Object.keys(targets);
+  const firstTarget = targets[targetNames[0]];
+  const timestamps = firstTarget.map((r) => r.timestamp);
+
+  const series = [{}];
+  const dataArrays = [timestamps];
+  const colors = ["#f87171", "#fb923c", "#fbbf24", "#a78bfa"];
+
+  targetNames.forEach((name, i) => {
+    series.push({
+      label: name,
+      stroke: colors[i % colors.length],
+      width: 1.5,
+      fill: colors[i % colors.length] + "33",
+    });
+    const values = targets[name].map((r) => r.packet_loss_pct ?? null);
+    dataArrays.push(values);
+  });
+
+  const opts = {
+    width: container.clientWidth - 20,
+    height: 250,
+    series: series,
+    axes: [
+      {},
+      {
+        label: "Packet Loss (%)",
+        stroke: "var(--text-secondary)",
+        grid: { stroke: "rgba(255,255,255,0.05)" },
+      },
+    ],
+    scales: { x: { time: true }, y: { min: 0 } },
+    cursor: { show: true },
+  };
+
+  if (packetLossPlot) packetLossPlot.destroy();
+  packetLossPlot = new uPlot(opts, dataArrays, container);
+}
+
+// --- Error Log ---
+async function loadErrors(hours) {
+  try {
+    const res = await fetch(`/api/errors?hours=${hours}`);
+    const data = await res.json();
+    renderErrors(data);
+  } catch (e) {
+    console.error("Failed to load errors:", e);
+  }
+}
+
+function renderErrors(errors) {
+  const tbody = document.getElementById("error-table-body");
+  const emptyMsg = document.getElementById("error-empty");
+
+  if (!errors.length) {
+    tbody.innerHTML = "";
+    emptyMsg.style.display = "block";
+    return;
+  }
+
+  emptyMsg.style.display = "none";
+  tbody.innerHTML = errors
+    .map(
+      (e) => `
+    <tr>
+      <td>${formatTime(e.timestamp)}</td>
+      <td><span class="error-type error-type-${escapeHtml(e.check_type)}">${escapeHtml(e.check_type.toUpperCase())}</span></td>
+      <td>${escapeHtml(e.source)}</td>
+      <td>${escapeHtml(e.error_message)}</td>
+    </tr>`
+    )
+    .join("");
 }
 
 // --- XSS Protection ---

@@ -11,8 +11,10 @@
     <nav>
         <span class="logo">Network Monitor</span>
         <button class="active" data-page="status">Live Status</button>
+        <button data-page="health">Health</button>
         <button data-page="timeline">Timeline</button>
         <button data-page="outages">Outage Log</button>
+        <button data-page="errors">Error Log</button>
         <button data-page="speedtests">Speed Tests</button>
     </nav>
 
@@ -35,6 +37,16 @@
             </div>
         </div>
 
+        <!-- Health Page -->
+        <div id="page-health" class="page">
+            <div class="range-selector" id="health-range-selector">
+                <button class="active" data-range="24h">24 Hours</button>
+                <button data-range="7d">7 Days</button>
+                <button data-range="30d">30 Days</button>
+            </div>
+            <div id="health-cards" class="cards"></div>
+        </div>
+
         <!-- Timeline Page -->
         <div id="page-timeline" class="page">
             <div class="range-selector">
@@ -44,6 +56,10 @@
             </div>
             <div class="chart-container">
                 <div id="latency-chart"></div>
+            </div>
+            <h3 class="section-label">Packet Loss</h3>
+            <div class="chart-container">
+                <div id="packet-loss-chart"></div>
             </div>
         </div>
 
@@ -66,6 +82,32 @@
             </div>
             <p id="outage-empty" style="display:none; text-align:center; padding:2rem; color:var(--text-secondary);">
                 No outages detected. Your network is looking good!
+            </p>
+        </div>
+
+        <!-- Error Log Page -->
+        <div id="page-errors" class="page">
+            <div class="range-selector" id="error-range-selector">
+                <button class="active" data-hours="24">24 Hours</button>
+                <button data-hours="168">7 Days</button>
+                <button data-hours="720">30 Days</button>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Type</th>
+                            <th>Source</th>
+                            <th>Error</th>
+                        </tr>
+                    </thead>
+                    <tbody id="error-table-body">
+                    </tbody>
+                </table>
+            </div>
+            <p id="error-empty" style="display:none; text-align:center; padding:2rem; color:var(--text-secondary);">
+                No errors in this time range.
             </p>
         </div>
 

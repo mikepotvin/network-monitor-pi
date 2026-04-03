@@ -8,7 +8,7 @@ Type=simple
 User=networkmon
 Group=networkmon
 WorkingDirectory=/opt/network-monitor
-ExecStart=/opt/network-monitor/venv/bin/gunicorn -w 1 -b 0.0.0.0:5000 src.web:app
+ExecStart=/opt/network-monitor/venv/bin/gunicorn -w 1 --timeout 60 -b 0.0.0.0:5000 src.web:app
 Restart=always
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
